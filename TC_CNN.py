@@ -24,9 +24,12 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.preprocessing.image import ImageDataGenerator
 
 
+TCs = ['AL0'+str(i)+2017 if i<10 else 'AL'+str(i)+'2017' for i in np.arange(2)]
+
 TC_id = 'AL092017'
 
-save_dir = 'C:/Users/carlo/Desktop/Satellite_images/'+TC_id+'/'
+#save_dir = 'C:/Users/carlo/Desktop/Satellite_images/'+TC_id+'/'
+save_dir = '/scratch/cmc13/Satellite_images/'+TC_id+'/'
 
 images_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
 page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC_id
