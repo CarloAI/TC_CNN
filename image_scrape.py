@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import Image
 
+local_dir = '/scratch/cmc13/Satellite_images/'
 
 def download_file(link,local_dir):
     '''This function downloads the images found at the "link" and saves them in
@@ -30,18 +31,22 @@ def download_file(link,local_dir):
                     f.write(chunk)
     return
 
-TCs = ['AL0'+str(i)+'2017' if i<10 else 'AL'+str(i)+'2017' for i in np.arange(1,3)]
+TCs = ['AL0'+str(i)+'2017' if i<10 else 'AL'+str(i)+'2017' for i in np.arange(15,16)]
 
 for TC in TCs:
     TC_id = TC
-    
-    save_dir = 'C:/Users/carlo/Desktop/Satellite_images/'+TC_id+'/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
 
+    # URL paths
     images_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
     page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC_id
-    images_path = 'http://rammb.cira.colostate.edu/products/tc_realtime/'+TC_id+'/'
+#    images_path = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
+
+    # Create a new folder for each TC. If it already exists, continue with the next TC
+    save_dir = local_dir + TC_id + '/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    else:
+        continue
 
     # Write a README file with the name of the TC and the type of satellite image
     req = requests.get(images_url)
@@ -53,6 +58,9 @@ for TC in TCs:
 
     # Find all objects with extension .GIF and download them
     for anchor in soup.findAll('a', href=True):
-        im_url = anchor['href']
-        if im_url[-4:] == '.GIF':
-            download_file(images_path+im_url, save_dir)
+       im_url = anchor['href']
+       if im_url[-4:] == '.GIF':
+           download_file(images_url+im_url, save_dir)
+
+
+

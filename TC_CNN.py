@@ -7,11 +7,9 @@ Created on Tue Nov 21 17:37:47 2017
 
 import pandas as pd
 import numpy as np
-import requests
 import os
 import glob
 import matplotlib.pyplot as plt
-from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import Image
 
@@ -23,51 +21,22 @@ from keras.utils import np_utils
 from keras.layers import Conv2D, MaxPooling2D
 from keras.preprocessing.image import ImageDataGenerator
 
+local_dir = '/scratch/cmc13/Satellite_images/'
 
-TCs = ['AL0'+str(i)+2017 if i<10 else 'AL'+str(i)+'2017' for i in np.arange(2)]
+TCs = ['AL0'+str(i)+'2017' if i<10 else 'AL'+str(i)+'2017' for i in np.arange(1,5)]
 
-TC_id = 'AL092017'
-
-#save_dir = 'C:/Users/carlo/Desktop/Satellite_images/'+TC_id+'/'
-save_dir = '/scratch/cmc13/Satellite_images/'+TC_id+'/'
-
-images_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
-page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC_id
-images_path = 'http://rammb.cira.colostate.edu/products/tc_realtime/'+TC_id+'/'
-
-req = requests.get(images_url)
-soup = BeautifulSoup(req.text, "lxml")
-title = soup('title')[0].string
-
-f = open(save_dir+'README.txt','w') 
-f.write(title)
-f.close()
-
-def download_file(link,local_dir):
+for TC in TCs:
     
-    local_filename = link.split('/')[-1]
-    r = requests.get(link, stream=True)
-    if str(r) == '<Response [200]>':
-        with open(local_dir+local_filename, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1024): 
-                if chunk:
-                    f.write(chunk)
-    return
+    TC_id = TC
 
-for anchor in soup.findAll('a', href=True):
-    im_url = anchor['href']
-    if im_url[-4:] == '.GIF':
-        download_file(images_path+im_url, save_dir)
+    save_dir = local_dir + TC_id + '/'
+
         
-
-
-#%%
-        
-tables = pd.read_html(page_url,header=0)
-intensity_table = tables[1]
-# Convert time column from float to datetime format
-intensity_table['Synoptic Time'] = pd.to_datetime(intensity_table['Synoptic Time'], 
-                                                  format='%Y%m%d%H%M')
+    tables = pd.read_html(page_url,header=0)
+    intensity_table = tables[1]
+    # Convert time column from float to datetime format
+    intensity_table['Synoptic Time'] = pd.to_datetime(intensity_table['Synoptic Time'], 
+                                                      format='%Y%m%d%H%M')
 
 #%%
 # number of rows to exclude
@@ -77,17 +46,33 @@ nr = 60
 h = 480-2*nr
 w = 640-2*nr
 
-image_datetime = []
+
 X = np.zeros((h,w))
-#i = 0
-for filename in glob.glob(os.path.join(save_dir, '*.GIF')):
-    image_datetime.append(datetime.strptime(os.path.basename(filename)[-16:-4], 
-                                            '%Y%m%d%H%M'))
-    im = Image.open(filename)
-    im_array = np.array(im)[nr:-nr,nr:-nr]
-    X = np.dstack((X,im_array))
-#    i += 1
-#    if i == 5: break
+for TC in TCs:
+    
+    # Local directories for stored images
+    save_dir = local_dir + TC + '/'
+    # URL path
+    page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC
+    
+    # Retrieve intensity table 
+    tables = pd.read_html(page_url,header=0)
+    intensity_table = tables[1]
+    # Convert time column from float to datetime format
+    intensity_table['Synoptic Time'] = pd.to_datetime(intensity_table['Synoptic Time'], 
+                                                      format='%Y%m%d%H%M')
+    
+    i = 0
+    image_datetime = []
+    
+    for filename in glob.glob(os.path.join(save_dir, '*.GIF')):
+        image_datetime.append(datetime.strptime(os.path.basename(filename)[-16:-4], 
+                                                                '%Y%m%d%H%M'))
+        im = Image.open(filename)
+        im_array = np.array(im)[nr:-nr,nr:-nr]
+        X = np.dstack((X,im_array))
+        i += 1
+        if i == 5: break
 
 # ReReshape the input to take the shape (batch, height, width, channels)
 X = np.swapaxes(np.swapaxes(X,0,1),0,2) 
@@ -96,34 +81,38 @@ X = X.reshape(X.shape[0], h, w, 1)
 # Delete first image (black image - used to initialize the array)
 X = np.delete(X,[0],axis=0)
 
+# Change type of input to float32
 X = X.astype('float32')
     
-# Take closest tim
-def nearest(ts): 
-    return min(intensity_table['Synoptic Time'], key=lambda d: abs(d-ts))
+# Take closest time
+def nearest(ts, intensity_df): 
+    return min(intensity_df['Synoptic Time'], key=lambda d: abs(d-ts))
 
 
 # Assign intensity to each image
-Y = np.zeros([len(image_datetime),], dtype=int)
-y = np.zeros([len(image_datetime),], dtype=int)
-for i in np.arange(len(image_datetime)):
-    Y[i] = round(intensity_table[intensity_table['Synoptic Time']==
-                                      nearest(image_datetime[i])]['Intensity']\
-                                                        * 0.514444).astype(int)
-    if Y[i] < 18: 
-        y[i] = 1
-    elif Y[i] >= 18 and Y[i] < 33:
-        y[i] = 2
-    elif Y[i] >= 33 and Y[i] < 43:
-        y[i] = 3
-    elif Y[i] >= 43 and Y[i] < 50:
-        y[i] = 4
-    elif Y[i] >= 50 and Y[i] < 58:
-        y[i] = 5
-    elif Y[i] >= 58 and Y[i] < 70:
-        y[i] = 6
-    elif Y[i] >= 70: 
-        y[i] = 7
+def assign_intensity(image_dt, intensity_df):
+    Y = np.zeros([len(image_dt),], dtype=int)
+    y = np.zeros([len(image_dt),], dtype=int)
+    for i in np.arange(len(image_dt)):
+        Y[i] = round(intensity_df[intensity_df['Synoptic Time']==
+                                          nearest(image_dt[i])]['Intensity']\
+                                                            * 0.514444).astype(int)
+        if Y[i] < 18: 
+            y[i] = 1
+        elif Y[i] >= 18 and Y[i] < 33:
+            y[i] = 2
+        elif Y[i] >= 33 and Y[i] < 43:
+            y[i] = 3
+        elif Y[i] >= 43 and Y[i] < 50:
+            y[i] = 4
+        elif Y[i] >= 50 and Y[i] < 58:
+            y[i] = 5
+        elif Y[i] >= 58 and Y[i] < 70:
+            y[i] = 6
+        elif Y[i] >= 70: 
+            y[i] = 7
+            
+        return Y,y
     
 # Split data into train and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
