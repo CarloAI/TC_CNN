@@ -15,14 +15,15 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import Image
 
-local_dir = '/scratch/cmc13/Satellite_images/'
+image_dir = '/scratch/cmc13/Satellite_images/'
+gif_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/'
 
 def download_file(link,local_dir):
     '''This function downloads the images found at the "link" and saves them in
        the directory "local_dir"
     '''
     
-    local_filename = link.split('/')[-1]
+    local_filename = link.strip().split('/')[-1]
     r = requests.get(link, stream=True)
     if str(r) == '<Response [200]>':
         with open(local_dir+local_filename, 'wb') as f:
@@ -31,18 +32,16 @@ def download_file(link,local_dir):
                     f.write(chunk)
     return
 
-TCs = ['AL0'+str(i)+'2017' if i<10 else 'AL'+str(i)+'2017' for i in np.arange(15,16)]
+TCs = ['SH0'+str(i)+'2017' if i<10 else 'SH'+str(i)+'2017' for i in np.arange(1,20)]
 
 for TC in TCs:
     TC_id = TC
 
     # URL paths
     images_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
-    page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC_id
-#    images_path = 'http://rammb.cira.colostate.edu/products/tc_realtime/archive.asp?product=4kmirimg&storm_identifier='+TC_id
 
     # Create a new folder for each TC. If it already exists, continue with the next TC
-    save_dir = local_dir + TC_id + '/'
+    save_dir = image_dir + TC_id + '/'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     else:
@@ -60,7 +59,7 @@ for TC in TCs:
     for anchor in soup.findAll('a', href=True):
        im_url = anchor['href']
        if im_url[-4:] == '.GIF':
-           download_file(images_url+im_url, save_dir)
+           download_file(gif_url+im_url, save_dir)
 
 
 

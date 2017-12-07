@@ -7,11 +7,8 @@ Created on Tue Nov 21 17:37:47 2017
 
 import pandas as pd
 import numpy as np
-import os
-import glob
 import matplotlib.pyplot as plt
-from datetime import datetime
-from PIL import Image
+import h5py
 
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
@@ -22,107 +19,35 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.preprocessing.image import ImageDataGenerator
 
 #%%
-# Take the closest time
-def nearest(ts, intensity_df):
-    ''' This function compares the datetime "ts" with the datetimes at which 
-        intesity is recorded in the dataframe "intensity_df". 
-        The closest time is returned.
-    '''
-    return min(intensity_df['Synoptic Time'], key=lambda d: abs(d-ts))
+# Load data from hdf5 files
+fX = h5py.File('X_92TC.hdf5','r')
+X = fX['Input_X'][:]
+fX.close()
 
- # Assign intensity to each image
-def assign_intensity(image_dt, intensity_df):
-    ''' This function assigns the closest (in time) intensity taken from the 
-        dataframe "intensity_df" to "image_dt".
-        Then returns the intensity (in m/s) and the category (1-7).
-    '''
-    Y = round(intensity_df[intensity_df['Synoptic Time']==
-                           nearest(image_dt,intensity_df)]['Intensity'].values[0]\
-                                                        * 0.514444).astype(int)
-    if Y < 18: 
-        y = 1
-    elif Y >= 18 and Y < 33:
-        y = 2
-    elif Y >= 33 and Y < 43:
-        y = 3
-    elif Y >= 43 and Y < 50:
-        y = 4
-    elif Y >= 50 and Y < 58:
-        y = 5
-    elif Y >= 58 and Y < 70:
-        y = 6
-    elif Y >= 70: 
-        y = 7
-        
-    return Y,y
+fY = h5py.File('Y_92TC.hdf5','r')
+Y = fY['Target_Y'][:]
+fY.close()
 
-#%%
-image_dir = '/scratch/cmc13/Satellite_images/'
-TCs = os.listdir(image_dir)
+fy = h5py.File('y_92TC.hdf5','r')
+y = fy['Target_y'][:]
+fy.close()
 
-# Reduced images size
-rh = 120
-rw = 160
+#%% Retrieve dimensions
 
-# number of rows to exclude
-nr = 15
+# Number of input images
+m = len(X[:,0,0,0])
 
-# Image dimensions
-h = rh-2*nr
-w = rw-2*nr
+# Height of images
+h = len(X[0,:,0,0])
 
-X = np.zeros((h,w))
-Y = np.zeros((1,), dtype=int)
-y = np.zeros((1,), dtype=int)
-image_datetime = []
-for TC in TCs:
-    
-    print(TC)
-    # Local directories for stored images
-    TC_dir = image_dir + TC + '/'
+# Width of images
+w = len(X[0,0,:,0])
 
-    # URL path
-    page_url = 'http://rammb.cira.colostate.edu/products/tc_realtime/storm.asp?storm_identifier='+TC
-    
-    # Retrieve intensity table and save it in a dataframe
-    tables = pd.read_html(page_url,header=0)
-    intensity_df = tables[1]
-    # Convert time column from float to datetime format
-    intensity_df['Synoptic Time'] = pd.to_datetime(intensity_df['Synoptic Time'], 
-                                                              format='%Y%m%d%H%M')
-  
-#    i = 0  
-    for filename in glob.glob(os.path.join(TC_dir, '*.GIF')):
-        image_datetime = datetime.strptime(os.path.basename(filename)[-16:-4], 
-                                                                '%Y%m%d%H%M')
-        im = Image.open(filename)
-        # reduce image size
-        reduc_im = im.resize((rw,rh),Image.ANTIALIAS)
-        # save image as a numpy array
-        im_array = np.array(reduc_im)[nr:-nr,nr:-nr]
-        X = np.dstack((X,im_array))
-        # assign intensity to the image
-        Y = np.append(Y,assign_intensity(image_datetime, intensity_df)[0])
-        y = np.append(y,assign_intensity(image_datetime, intensity_df)[1])
-#        i += 1
-#        if i == 5: break
-        
-
-# Reshape the input to take the shape (batch, height, width, channels)
-X = np.swapaxes(np.swapaxes(X,0,1),0,2) 
-X = X.reshape(X.shape[0], h, w, 1)
-
-# Delete first image (black image - used to initialize the array) and intensity
-X = np.delete(X,[0],axis=0)
-Y = np.delete(Y,[0],axis=0)
-y = np.delete(y,[0],axis=0)
-
-# Change type of input to float32
-X = X.astype('float32')
-
+# Number of channels
+c = len(X[0,0,0,:])
 
 #%%     
-# # Split data into train and test sets
+# Split data into train and test sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 X_train = X_train.astype('float32')
 X_test = X_test.astype('float32')
