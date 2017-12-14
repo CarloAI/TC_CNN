@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Thu Dec 14 16:14:43 2017
+
+@author: cmc13
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Dec  7 12:01:47 2017
 
 @author: cmc13
@@ -14,6 +22,7 @@ import h5py
 from datetime import datetime
 from PIL import Image
 import time
+from multiprocessing import Pool, cpu_count
 
 #%%
 # Take the closest time
@@ -58,10 +67,7 @@ def assign_intensity(image_dt, intensity_df):
 t1 = time.time()    
 
 image_dir = '/scratch/cmc13/Satellite_images/'
-TTCs = os.listdir(image_dir)
-TCs = ['EP092016','CP092016','WP082016']
-for TC in TTCs[0:30]:
-    TCs.append(TC)
+TCs = os.listdir(image_dir)
 
 # Image size
 rh = 480
@@ -79,13 +85,9 @@ nr = int(60/f)
 h = rh-2*nr
 w = rw-2*nr
 
-X = np.zeros((1,h,w,3)).astype('float32')
-Y = np.zeros((1,), dtype=int)
-y = np.zeros((1,), dtype=int)
-image_datetime = []
-for TC in TCs:
-    
+def create_input_images(TC):
     print(TC)
+    
     # Local directories for stored images
     TC_dir = image_dir + TC + '/'
     
@@ -96,7 +98,7 @@ for TC in TCs:
     try:
         tables = pd.read_html(page_url,header=0)
     except:
-        continue
+        return None
 
     intensity_df = tables[1]
     # Convert time column from float to datetime format
@@ -106,7 +108,10 @@ for TC in TCs:
     intensity_df = intensity_df.resample('15T').sum()
     intensity_df = intensity_df.interpolate()
 
-    i = 0  
+#    i = 0
+    X = np.zeros((1,h,w,3)).astype('float32')
+    Y = np.zeros((1,), dtype=int)
+    y = np.zeros((1,), dtype=int)
     for filename in glob.glob(os.path.join(TC_dir, '*.GIF')):
         image_datetime = datetime.strptime(os.path.basename(filename)[-16:-4], 
                                                                 '%Y%m%d%H%M')
@@ -121,33 +126,44 @@ for TC in TCs:
         # assign intensity to the image
         Y = np.append(Y,assign_intensity(image_datetime, intensity_df)[0])
         y = np.append(y,assign_intensity(image_datetime, intensity_df)[1])
-        i += 1
-        if i == 10: break
+                
+#        i += 1
+#        if i == 10: break
+    
+    X = np.delete(X,[0],axis=0)
+    Y = np.delete(Y,[0],axis=0)
+    y = np.delete(y,[0],axis=0)
+    
+    return X, Y, y
 
-## Reshape the input to take the shape (batch, height, width, channels)
-#X = np.swapaxes(np.swapaxes(X,0,1),0,2) 
-#X = X.reshape(X.shape[0], h, w, 3)
-
-# Delete first image (black image - used to initialize the array) and intensity
-X = np.delete(X,[0],axis=0)
-Y = np.delete(Y,[0],axis=0)
-y = np.delete(y,[0],axis=0)
+if __name__ == '__main__':
+    pool = Pool(processes=24)
+    # 'result' is a list of len(TCs) elements. Each element is a 3-element tuple.
+    # First tuple is X, second is Y and third is y.
+    XYy = pool.map(create_input_images, TCs)
+    
+Xl = [XYy[i][0] for i in np.arange(len(XYy)) if XYy[i] != None]
+X = np.concatenate(Xl)
+Yl = [XYy[i][1] for i in np.arange(len(XYy)) if XYy[i] != None]
+Y = np.concatenate(Yl)
+yl = [XYy[i][2] for i in np.arange(len(XYy)) if XYy[i] != None]
+y = np.concatenate(yl)
 
 print(time.time() - t1)
 
 #%%
 # Save data into hdf5 files
-#fX = h5py.File('X_92TC.hdf5','w')
-#fX.create_dataset('Input_X', data=X)
-#fX.close()
-#
-#fY = h5py.File('Y_92TC.hdf5','w')
-#fY.create_dataset('Target_Y', data=Y)
-#fY.close()
-#
-#fy = h5py.File('y_92TC.hdf5','w')
-#fy.create_dataset('Target_y', data=y)
-#fy.close()
+fX = h5py.File('X_186_TC.hdf5','w')
+fX.create_dataset('Input_X', data=X)
+fX.close()
+
+fY = h5py.File('Y_186_TC.hdf5','w')
+fY.create_dataset('Target_Y', data=Y)
+fY.close()
+
+fy = h5py.File('y_186_TC.hdf5','w')
+fy.create_dataset('Target_y', data=y)
+fy.close()
 
 
 
