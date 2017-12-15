@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 21 17:37:47 2017
@@ -9,6 +10,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+import time
 
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
@@ -19,6 +21,8 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.preprocessing.image import ImageDataGenerator
 import tensorflow as tf
 from keras.backend import tensorflow_backend as K
+
+t1 = time.time()
 
 #%%
 # Load data from hdf5 files
@@ -154,27 +158,29 @@ with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=24)) as sess:
     f.close()
     
     #%%
-    cat = {}
-    mislabel = {}
-    no_images = {}
-    no_mislab = {}
-    perc_mislab = {}
-    for i in range(number_of_classes):
-        cat[i] = predictions[np.where(y_test==i)]
-        mislabel[i] = np.nonzero(cat[i]-i)[0]
-        no_images[i] = len(cat[i])
-        no_mislab[i] = len(mislabel[i])
-        perc_mislab[i] = len(mislabel[i]) / len(cat[i])
-    
-    
-    print('\nNumber of images per category:')
-    for i in range(number_of_classes):
-        print('Category '+str(i)+':',no_images[i],'images, ',no_mislab[i],'mislabelled')
-    
-    print('\nPercentage of mislabelled images per category:')
-    for i in range(number_of_classes):
-        print('Category '+str(i)+':',round(perc_mislab[i]*100,1),'%')
-    
+cat = {}
+mislabel = {}
+no_images = {}
+no_mislab = {}
+perc_mislab = {}
+for i in range(number_of_classes):
+    cat[i] = predictions[np.where(y_test==i)]
+    mislabel[i] = np.nonzero(cat[i]-i)[0]
+    no_images[i] = len(cat[i])
+    no_mislab[i] = len(mislabel[i])
+    perc_mislab[i] = len(mislabel[i]) / len(cat[i])
+
+
+print('\nNumber of images per category:')
+for i in range(number_of_classes):
+    print('Category '+str(i)+':',no_images[i],'images, ',no_mislab[i],'mislabelled')
+
+print('\nPercentage of mislabelled images per category:')
+for i in range(number_of_classes):
+    print('Category '+str(i)+':',round(perc_mislab[i]*100,1),'%')
+
+print(time.time() - t1)
+
 #%%
 #fX = h5py.File('X_92TC.hdf5','r')
 #X_val = fX['Input_X'][-250:,:,:,:]

@@ -22,7 +22,7 @@ import h5py
 from datetime import datetime
 from PIL import Image
 import time
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool
 
 #%%
 # Take the closest time
@@ -137,16 +137,16 @@ def create_input_images(TC):
     return X, Y, y
 
 if __name__ == '__main__':
-    pool = Pool(processes=24)
+    pool = Pool(processes=4)
     # 'result' is a list of len(TCs) elements. Each element is a 3-element tuple.
     # First tuple is X, second is Y and third is y.
-    XYy = pool.map(create_input_images, TCs)
+    output = pool.map(create_input_images, TCs)
     
-Xl = [XYy[i][0] for i in np.arange(len(XYy)) if XYy[i] != None]
+Xl = [output[i][0] for i in np.arange(len(output)) if output[i] != None]
 X = np.concatenate(Xl)
-Yl = [XYy[i][1] for i in np.arange(len(XYy)) if XYy[i] != None]
+Yl = [output[i][1] for i in np.arange(len(output)) if output[i] != None]
 Y = np.concatenate(Yl)
-yl = [XYy[i][2] for i in np.arange(len(XYy)) if XYy[i] != None]
+yl = [output[i][2] for i in np.arange(len(output)) if output[i] != None]
 y = np.concatenate(yl)
 
 print(time.time() - t1)
