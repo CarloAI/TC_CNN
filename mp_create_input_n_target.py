@@ -6,17 +6,10 @@ Created on Thu Dec 14 16:14:43 2017
 @author: cmc13
 """
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec  7 12:01:47 2017
-
-@author: cmc13
-"""
-
 import pandas as pd
 import numpy as np
 import os
+import math
 import glob
 import h5py
 from datetime import datetime
@@ -67,14 +60,26 @@ def assign_intensity(image_dt, intensity_df):
 t1 = time.time()    
 
 image_dir = '/scratch/cmc13/Satellite_images/'
-TCs = os.listdir(image_dir)
+all_TCs = os.listdir(image_dir)
+N = len(all_TCs)
+#[sum([os.path.getsize(image_dir+TC+'/'+f) for f in os.listdir(image_dir+TC+'/')])/
+#    ...: (1024*1024) for TC in TCs]
+
+# batch size
+M = 4
+batches = ['b'+str(i) for i in range(math.ceil(N/M))]
+TCs = {}
+i = 0
+for batch in batches:
+    TCs[batch] = [j for j in os.listdir(image_dir)[i*M:(i+1)*M]]
+    i += 1
 
 # Image size
 rh = 480
 rw = 640
 
 # Reduce imgae size by a factor of f
-f = 1
+f = 4                           
 rh = int(rh/f)
 rw = int(rw/f)
 
@@ -86,8 +91,8 @@ h = rh-2*nr
 w = rw-2*nr
 
 def create_input_images(TC):
+
     print(TC)
-    
     # Local directories for stored images
     TC_dir = image_dir + TC + '/'
     
@@ -136,17 +141,20 @@ def create_input_images(TC):
     
     return X, Y, y
 
-if __name__ == '__main__':
-    pool = Pool(processes=4)
-    # 'result' is a list of len(TCs) elements. Each element is a 3-element tuple.
-    # First tuple is X, second is Y and third is y.
-    output = pool.map(create_input_images, TCs)
+output = {}
+for batch in batches:
+    if __name__ == '__main__':
+        pool = Pool(processes=4)
+        # 'output' is a dict containing lists of M elements. 
+        # Each element is a 3-element tuple.
+        # First tuple is X, second is Y and third is y.
+        output[batch] = pool.map(create_input_images, TCs[batch])
     
-Xl = [output[i][0] for i in np.arange(len(output)) if output[i] != None]
+Xl = [output[j][i][0] for j in batches for i in np.arange(len(output[j])) if output[j][i] != None]
 X = np.concatenate(Xl)
-Yl = [output[i][1] for i in np.arange(len(output)) if output[i] != None]
+Yl = [output[j][i][1] for j in batches for i in np.arange(len(output[j])) if output[j][i] != None]
 Y = np.concatenate(Yl)
-yl = [output[i][2] for i in np.arange(len(output)) if output[i] != None]
+yl = [output[j][i][2] for j in batches for i in np.arange(len(output[j])) if output[j][i] != None]
 y = np.concatenate(yl)
 
 print(time.time() - t1)
@@ -166,7 +174,7 @@ fy.create_dataset('Target_y', data=y)
 fy.close()
 
 
-
+print('\nProgram sucessfully executed.')
 
 
 

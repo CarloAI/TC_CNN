@@ -19,6 +19,12 @@ TCs = [ b+'0'+str(i)+year if i<10 else b+str(i)+year
                             for i in np.arange(1,31)
                             for b in ['AL','EP','CP','WP','IO','SH'] ]
 
+TCs = ['AL042015','AL112015','EP012015','EP022015','EP052015','EP102015',
+       'EP122015','EP132015','EP152015','EP192015','EP202015','EP222015',
+       'CP032015','WP022015','WP042015','WP062015','WP072015','WP092015',
+       'WP112015','WP132015','WP162015','WP172015','WP202015','WP212015',
+       'WP222015','WP242015','WP252015','WP272015','WP282015']
+
 def download_file(link,local_dir):
     '''This function downloads the images found at the "link" and saves them in
        the directory "local_dir"
